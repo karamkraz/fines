@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fines Charging - EV Dashboard</title>
+<!-- Оптимизиран Favicon за Tesla Browser с векторна мълния -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23111111'/><path d='M58 5 L18 55 H48 L42 95 L82 45 H52 Z' fill='%23FFD700' stroke='%23FF8C00' stroke-width='3' stroke-linejoin='round'/></svg>">    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        /* Тема по подразбиране (Тъмна / Нощ) */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 950px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #111111;
+            color: #ffffff;
+            transition: background-color 0.4s ease, color 0.4s ease;
+        }
+
+        /* Светла тема (Ден) */
+        body.light-theme {
+            background-color: #f4f6f8;
+            color: #1a1a1a;
+        }
+
+        body.light-theme .lang-switch,
+        body.light-theme .btn-refresh,
+        body.light-theme .search-box,
+        body.light-theme .card {
+            background: #ffffff;
+            border-color: #e0e0e0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        body.light-theme input[type="text"],
+        body.light-theme select {
+            background: #f0f2f5;
+            color: #1a1a1a;
+            border-color: #ccc;
+        }
+
+        body.light-theme .btn-quick {
+            background: #eef4ff;
+            color: #0066cc;
+            border-color: #cce0ff;
+        }
+
+        body.light-theme .card-title {
+            color: #1a1a1a;
+        }
+
+        body.light-theme .card-address {
+            color: #666;
+        }
+
+        body.light-theme .connector {
+            border-top-color: #eee;
+        }
+
+        /* Двуколонна решетка за картите */
+        #results {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        /* Показваме съобщенията за зареждане и грешки през целия ред */
+        #results .info-msg, 
+        #results .loading {
+            grid-column: 1 / -1;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        h2 { margin: 0; color: #0088ff; font-size: 26px; }
+
+        .controls-top {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* Бутони за език */
+        .lang-switch {
+            display: flex;
+            gap: 4px;
+            background: #1e1e1e;
+            padding: 4px;
+            border-radius: 8px;
+        }
+        .btn-lang {
+            background: transparent;
+            color: #888;
+            border: none;
+            padding: 8px 12px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            min-width: auto;
+        }
+        .btn-lang.active {
+            background-color: #0088ff;
+            color: #ffffff;
+        }
+
+        /* Бутон за автоматично опресняване */
+        .btn-refresh {
+            background: #1e1e1e;
+            color: #aaa;
+            border: 1px solid #333;
+            padding: 8px 14px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-refresh.active {
+            background: #0088ff;
+            color: #fff;
+            border-color: #0088ff;
+        }
+
+        /* Форма за търсене */
+        .search-box {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 15px;
+            background: #1e1e1e;
+            padding: 15px;
+            border-radius: 12px;
+        }
+        input, select, button {
+            padding: 14px 18px;
+            font-size: 18px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            outline: none;
+        }
+        input[type="text"] {
+            flex-grow: 1;
+            background: #2a2a2a;
+            color: #fff;
+            min-width: 0;
+        }
+        select {
+            background: #2a2a2a;
+            color: #fff;
+        }
+        .btn-search {
+            background-color: #0088ff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            min-width: 110px;
+        }
+        .btn-search:active { background-color: #0055aa; }
+
+        /* Бързи бутони за градове */
+        .quick-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 25px;
+        }
+        .btn-quick {
+            background: #2a2a2a;
+            color: #4da6ff;
+            border: 1px solid #444;
+            padding: 10px 16px;
+            font-size: 16px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        .btn-quick:active { background: #0088ff; color: white; }
+
+        /* Карти за локациите */
+        .card {
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 6px solid #0088ff;
+            margin-bottom: 0; /* Контролира се от grid gap */
+        }
+        .card-title { font-size: 20px; font-weight: bold; margin-bottom: 6px; color: #fff; }
+        .card-address { color: #aaa; font-size: 15px; margin-bottom: 15px; }
+        .card-address a { color: #4da6ff; text-decoration: underline; }
+        .connector {
+            padding: 10px 0;
+            border-top: 1px solid #333;
+            font-size: 16px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .status-ok { color: #00e676; font-weight: bold; }
+        .status-not-ok { color: #ff5252; font-weight: bold; }
+        .loading { font-size: 20px; text-align: center; color: #888; margin: 30px 0; }
+        .info-msg { text-align: center; font-size: 18px; color: #aaa; margin-top: 20px; }
+        .last-update { text-align: right; font-size: 13px; color: #666; margin-bottom: 10px; }
+
+        /* Стил за подравняване и размер на векторните икони */
+        .icon {
+            width: 1.1em;
+            height: 1.1em;
+            vertical-align: -0.15em;
+            display: inline-block;
+        }
+
+        /* Оптимизация за мобилни устройства */
+        @media (max-width: 768px) {
+            #results {
+                grid-template-columns: 1fr; /* Връщане към 1 колона за малки екрани */
+            }
+
+            body {
+                padding: 12px;
+            }
+
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .controls-top {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .search-box {
+                display: grid;
+                grid-template-columns: 1fr auto;
+                gap: 10px;
+                padding: 12px;
+            }
+
+            input[type="text"] {
+                grid-column: 1 / -1;
+                width: 100%;
+            }
+
+            select {
+                grid-column: 1;
+            }
+
+            .btn-search {
+                grid-column: 2;
+                min-width: auto;
+            }
+
+            .btn-quick {
+                padding: 8px 14px;
+                font-size: 14px;
+            }
+
+            .connector {
+                font-size: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+     <h2>
+        <svg class="icon" viewBox="0 0 100 100"><path d="M58 5 L18 55 H48 L42 95 L82 45 H52 Z" fill="#FFD700" stroke="#FF8C00" stroke-width="3" stroke-linejoin="round"/></svg>
+         Fines Charging Status
+     </h2>
+        <div class="controls-top">
+            <button class="btn-refresh" id="btn-auto-refresh" onclick="toggleAutoRefresh()">
+               <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#0088ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+               <span id="refresh-text">Auto 2 min</span>
+            </button>
+            <div class="lang-switch">
+                <button class="btn-lang" id="btn-bg" onclick="setLanguage('bg')">BG</button>
+                <button class="btn-lang" id="btn-en" onclick="setLanguage('en')">EN</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="search-box">
+        <input type="text" id="cityInput" placeholder="" onkeypress="if(event.key==='Enter') searchStations()" autofocus />
+        <select id="typeSelect" onchange="searchStations()">
+            <option value="" id="opt-ccs"></option>
+            <option value="AC" id="opt-ac"></option>
+            <option value="CHAdeMO" id="opt-chademo"></option>
+        </select>
+        <button class="btn-search" onclick="searchStations()" id="btn-search-text"></button>
+    </div>
+
+    <!-- Разширен списък с бързи бутони -->
+    <div class="quick-buttons">
+        <button class="btn-quick" onclick="quickSearch('Автомагистрала Тракия')" id="btn-hwy-a1"></button>
+        <button class="btn-quick" onclick="quickSearch('Автомагистрала Хемус')" id="btn-hwy-a2"></button>
+        <button class="btn-quick" onclick="quickSearch('Автомагистрала Струма')" id="btn-hwy-a3"></button>
+        <button class="btn-quick" onclick="quickSearch('София')" id="btn-city-sf"></button>
+        <button class="btn-quick" onclick="quickSearch('Пловдив')" id="btn-city-pl"></button>
+        <button class="btn-quick" onclick="quickSearch('Варна')" id="btn-city-vn"></button>
+        <button class="btn-quick" onclick="quickSearch('Бургас')" id="btn-city-bs"></button>
+        <button class="btn-quick" onclick="quickSearch('Велико Търново')" id="btn-city-vt"></button>
+        <button class="btn-quick" onclick="quickSearch('Русе')" id="btn-city-rs"></button>
+        <button class="btn-quick" onclick="quickSearch('Стара Загора')" id="btn-city-sz"></button>
+        <button class="btn-quick" onclick="quickSearch('Шумен')" id="btn-city-sh"></button>
+        <button class="btn-quick" onclick="quickSearch('Търговище')" id="btn-city-tg"></button>
+        <button class="btn-quick" onclick="quickSearch('Добрич')" id="btn-city-db"></button>
+        <button class="btn-quick" onclick="quickSearch('Видин')" id="btn-city-vd"></button>
+    </div>
+
+    <div id="last-update-time" class="last-update"></div>
+    <div id="results"></div>
+
+    <script>
+        const i18n = {
+            bg: {
+                placeholder: "Въведете град...",
+                btnSearch: "Търси",
+                optCcs: "Само CCS",
+                optAc: "CCS + AC",
+                optChademo: "CCS + CHAdeMO",
+                autoRefreshOn: "Auto 120s: ВКЛ",
+                autoRefreshOff: "Auto 120s: ИЗКЛ",
+                cityVT: "В. Търново",
+                cityTG: "Търговище",
+                citySF: "София",
+                cityPL: "Пловдив",
+                cityVN: "Варна",
+                cityBS: "Бургас",
+                cityRS: "Русе",
+                citySZ: "Ст. Загора",
+                cityPV: "Плевен",
+                citySH: "Шумен",
+                cityBL: "Благоевград",
+                cityDB: "Добрич",
+                cityVD: "Видин",
+                hwyA1: "АМ Тракия",
+                hwyA2: "АМ Хемус",
+                hwyA3: "АМ Струма",
+                promptInput: "Моля, въведете град или изберете от бутоните.",
+                loading: "⏳ Зареждане на данните...",
+                noLocations: "Не са намерени локации.",
+                noAddress: "Няма адрес",
+                connectorLabel: "Кабел",
+                noConnectors: "Няма намерени конектори от избрания тип.",
+                errorMsg: "Грешка при зареждането на данните.",
+                updatedAt: "Последно обновяване:"
+            },
+            en: {
+                placeholder: "Enter city...",
+                btnSearch: "Search",
+                optCcs: "CCS Only",
+                optAc: "CCS + AC",
+                optChademo: "CCS + CHAdeMO",
+                autoRefreshOn: "Auto 120s: ON",
+                autoRefreshOff: "Auto 120s: OFF",
+                cityVT: "Veliko Tarnovo",
+                cityTG: "Targovishte",
+                citySF: "Sofia",
+                cityPL: "Plovdiv",
+                cityVN: "Varna",
+                cityBS: "Burgas",
+                cityRS: "Ruse",
+                citySZ: "Stara Zagora",
+                cityPV: "Pleven",
+                citySH: "Shumen",
+                cityBL: "Blagoevgrad",
+                cityDB: "Dobrich",
+                cityVD: "Vidin",
+                hwyA1: "A1 Highway (Trakia)",
+                hwyA2: "A2 Highway (Hemus)",
+                hwyA3: "A3 Highway (Struma)",
+                promptInput: "Please enter a city or select from the quick buttons.",
+                loading: "⏳ Loading data...",
+                noLocations: "No locations found.",
+                noAddress: "No address available",
+                connectorLabel: "Cable",
+                noConnectors: "No connectors found matching your selection.",
+                errorMsg: "Error loading data.",
+                updatedAt: "Last updated:"
+            }
+        };
+
+        let currentLang = localStorage.getItem('fines_lang') || 'bg';
+        let refreshTimer = null;
+        let isAutoRefreshActive = false;
+
+        // Автоматично определяне на Ден / Нощ спрямо часа
+        function applyDayNightTheme() {
+            const hour = new Date().getHours();
+            // Светла тема между 07:00 и 19:00 часа
+            const isDay = hour >= 7 && hour < 19;
+            
+            if (isDay) {
+                document.body.classList.add('light-theme');
+            } else {
+                document.body.classList.remove('light-theme');
+            }
+        }
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('fines_lang', lang);
+            updateUI();
+            
+            if (document.getElementById('cityInput').value.trim() !== '') {
+                searchStations(true);
+            }
+        }
+
+        function updateUI() {
+            const t = i18n[currentLang];
+            
+            document.getElementById('btn-bg').classList.toggle('active', currentLang === 'bg');
+            document.getElementById('btn-en').classList.toggle('active', currentLang === 'en');
+            
+            document.getElementById('cityInput').placeholder = t.placeholder;
+            document.getElementById('btn-search-text').innerText = t.btnSearch;
+            document.getElementById('opt-ccs').innerText = t.optCcs;
+            document.getElementById('opt-ac').innerText = t.optAc;
+            document.getElementById('opt-chademo').innerText = t.optChademo;
+            
+            document.getElementById('refresh-text').innerText = isAutoRefreshActive ? t.autoRefreshOn : t.autoRefreshOff;
+
+            document.getElementById('btn-city-vt').innerText = t.cityVT;
+            document.getElementById('btn-city-tg').innerText = t.cityTG;
+            document.getElementById('btn-city-sf').innerText = t.citySF;
+            document.getElementById('btn-city-pl').innerText = t.cityPL;
+            document.getElementById('btn-city-vn').innerText = t.cityVN;
+            document.getElementById('btn-city-bs').innerText = t.cityBS;
+            document.getElementById('btn-city-rs').innerText = t.cityRS;
+            document.getElementById('btn-city-sz').innerText = t.citySZ;
+            document.getElementById('btn-city-sh').innerText = t.citySH;
+            document.getElementById('btn-city-db').innerText = t.cityDB;
+            document.getElementById('btn-city-vd').innerText = t.cityVD;
+            document.getElementById('btn-hwy-a1').innerText = t.hwyA1;
+            document.getElementById('btn-hwy-a2').innerText = t.hwyA2;
+            document.getElementById('btn-hwy-a3').innerText = t.hwyA3;
+        }
+
+        function toggleAutoRefresh() {
+            isAutoRefreshActive = !isAutoRefreshActive;
+            const btn = document.getElementById('btn-auto-refresh');
+            btn.classList.toggle('active', isAutoRefreshActive);
+            
+            const t = i18n[currentLang];
+            document.getElementById('refresh-text').innerText = isAutoRefreshActive ? t.autoRefreshOn : t.autoRefreshOff;
+
+            if (isAutoRefreshActive) {
+                refreshTimer = setInterval(() => {
+                    if (document.getElementById('cityInput').value.trim() !== '') {
+                        searchStations(true);
+                    }
+                }, 120000);
+            } else {
+                clearInterval(refreshTimer);
+                refreshTimer = null;
+            }
+        }
+
+        function quickSearch(cityName) {
+            document.getElementById('cityInput').value = cityName;
+            searchStations();
+        }
+
+        async function searchStations(isSilentRefresh = false) {
+            const t = i18n[currentLang];
+            const searchTerm = document.getElementById('cityInput').value.trim().toLowerCase();
+            const secondType = document.getElementById('typeSelect').value.toLowerCase();
+            const resultsDiv = document.getElementById('results');
+            const updateTimeDiv = document.getElementById('last-update-time');
+            
+            // Дефиниции за SVG икони
+            const svgPin = `<svg class="icon" viewBox="0 0 24 24" fill="#ff4d4d"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
+            const svgHome = `<svg class="icon" viewBox="0 0 24 24" fill="#4da6ff"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>`;
+            const svgCheck = `<svg class="icon" viewBox="0 0 24 24" fill="#00e676"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>`;
+            const svgCross = `<svg class="icon" viewBox="0 0 24 24" fill="#ff5252"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.52 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>`;
+            // За зареждане (Loading):
+            const svgLoading = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;            
+
+            if (!searchTerm) {
+                resultsDiv.innerHTML = `<p class="info-msg">${t.promptInput}</p>`;
+                updateTimeDiv.innerText = '';
+                return;
+            }
+
+            if (!isSilentRefresh) {
+                resultsDiv.innerHTML = `<div class="loading">${t.loading}</div>`;
+            }
+
+            try {
+                const locResponse = await fetch('https://public.finescharging.com/v1/locations.geojson');
+                const locData = await locResponse.json();
+
+                const matchedLocations = locData.features.filter(f => {
+                    const nameMatch = f.properties.name && f.properties.name.toLowerCase().includes(searchTerm);
+                    const addrMatch = f.properties.address && JSON.stringify(f.properties.address).toLowerCase().includes(searchTerm);
+                    return nameMatch || addrMatch;
+                });
+
+                if (matchedLocations.length === 0) {
+                    resultsDiv.innerHTML = `<p class="info-msg">${t.noLocations}</p>`;
+                    updateTimeDiv.innerText = '';
+                    return;
+                }
+
+                let htmlOutput = '';
+
+                for (const loc of matchedLocations) {
+                    const locId = loc.id;
+                    const locName = loc.properties.name || 'Unknown';
+                    
+                    let address = t.noAddress;
+                    if (typeof loc.properties.address === 'object' && loc.properties.address !== null) {
+                        address = Object.values(loc.properties.address).join(', ');
+                    } else if (typeof loc.properties.address === 'string') {
+                        address = loc.properties.address;
+                    }
+
+                    const liveResponse = await fetch(`https://public.finescharging.com/v1/live/${locId}.json`);
+                    if (!liveResponse.ok) continue;
+                    const liveData = await liveResponse.json();
+
+                    if (!liveData.connectors) continue;
+
+                    const matchedConnectors = liveData.connectors.filter(conn => {
+                        const plug = (conn.plug_type || '').toLowerCase();
+                        const name = (conn.name || '').toLowerCase();
+                        
+                        const isCCS = plug.includes('ccs') || name.includes('ccs');
+                        const isSecond = secondType !== '' && (plug.includes(secondType) || name.includes(secondType));
+
+                        return isCCS || isSecond;
+                    });
+
+                    if (matchedConnectors.length > 0) {
+                        const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locName + ' ' + address)}`;
+
+                        htmlOutput += `
+                            <div class="card">
+                                <div class="card-title">${svgPin} ${locName}</div>
+                                <div class="card-address">
+                                    ${svgHome} <a href="${mapUrl}" target="_blank" style="color: #4da6ff; text-decoration: underline;">${address}</a>
+                                </div>
+                        `;
+
+                        matchedConnectors.forEach(conn => {
+                            const isAvailable = conn.available === true || (conn.status && conn.status.toLowerCase() === 'available');
+                            const icon = isAvailable ? svgCheck : svgCross;
+                            const statusClass = isAvailable ? 'status-ok' : 'status-not-ok';
+
+                            htmlOutput += `
+                                <div class="connector">
+                                    <span>${icon} <strong>${t.connectorLabel} ${conn.connector_id}</strong> (${conn.name || 'N/A'})</span>
+                                    <span class="${statusClass}">${conn.status} [${conn.max_power_kw} kW]</span>
+                                </div>
+                            `;
+                        });
+
+                        htmlOutput += `</div>`;
+                    }
+                }
+
+                resultsDiv.innerHTML = htmlOutput || `<p class="info-msg">${t.noConnectors}</p>`;
+                
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString();
+                updateTimeDiv.innerText = `${t.updatedAt} ${timeStr}`;
+
+            } catch (error) {
+                console.error(error);
+                resultsDiv.innerHTML = `<p style="color:#ff5252;" class="info-msg">${t.errorMsg}</p>`;
+            }
+        }
+
+        // Инициализация при зареждане
+        applyDayNightTheme();
+        updateUI();
+    </script>
+</body>
+</html>

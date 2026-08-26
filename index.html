@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fines Charging - EV Dashboard</title>
-<!-- Оптимизиран Favicon за Tesla Browser с векторна мълния -->
+    <title>Fines Charging - Status Dashboard</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23111111'/><path d='M58 5 L18 55 H48 L42 95 L82 45 H52 Z' fill='%23FFD700' stroke='%23FF8C00' stroke-width='3' stroke-linejoin='round'/></svg>">    <style>
         * {
             box-sizing: border-box;
@@ -30,14 +29,14 @@
         body.light-theme .lang-switch,
         body.light-theme .btn-refresh,
         body.light-theme .search-box,
-        body.light-theme .card {
+        body.light-theme .card,
+        body.light-theme .type-segmented-control {
             background: #ffffff;
             border-color: #e0e0e0;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
 
-        body.light-theme input[type="text"],
-        body.light-theme select {
+        body.light-theme input[type="text"] {
             background: #f0f2f5;
             color: #1a1a1a;
             border-color: #ccc;
@@ -59,6 +58,29 @@
 
         body.light-theme .connector {
             border-top-color: #eee;
+        }
+
+        body.light-theme .last-update {
+            color: #666;
+        }
+
+        body.light-theme .btn-type-segment {
+            color: #666;
+        }
+
+        body.light-theme .btn-type-segment.active {
+            background-color: #0088ff;
+            color: #ffffff;
+        }
+
+        /* Активен бутон за опресняване в светла тема */
+        body.light-theme .btn-refresh.active {
+            background: #0088ff;
+            color: #ffffff;
+            border-color: #0088ff;
+        }
+        body.light-theme .btn-refresh.active .icon-refresh {
+            stroke: #ffffff;
         }
 
         /* Двуколонна решетка за картите */
@@ -89,6 +111,13 @@
             align-items: center;
         }
 
+        /* Текст за последно обновяване в header-а */
+        .last-update {
+            font-size: 13px;
+            color: #aaa;
+            white-space: nowrap;
+        }
+
         /* Бутони за език */
         .lang-switch {
             display: flex;
@@ -113,6 +142,31 @@
             color: #ffffff;
         }
 
+        /* Segmented control за типа конектори */
+        .type-segmented-control {
+            display: flex;
+            background: #2a2a2a;
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        .btn-type-segment {
+            background: transparent;
+            color: #888;
+            border: none;
+            padding: 8px 14px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+        .btn-type-segment.active {
+            background-color: #0088ff;
+            color: #ffffff;
+        }
+
         /* Бутон за автоматично опресняване */
         .btn-refresh {
             background: #1e1e1e;
@@ -126,11 +180,19 @@
             display: flex;
             align-items: center;
             gap: 6px;
+            transition: all 0.2s ease;
+        }
+        .btn-refresh .icon-refresh {
+            stroke: #0088ff;
+            transition: stroke 0.2s ease;
         }
         .btn-refresh.active {
             background: #0088ff;
-            color: #fff;
+            color: #ffffff !important;
             border-color: #0088ff;
+        }
+        .btn-refresh.active .icon-refresh {
+            stroke: #ffffff;
         }
 
         /* Форма за търсене */
@@ -141,8 +203,9 @@
             background: #1e1e1e;
             padding: 15px;
             border-radius: 12px;
+            align-items: center;
         }
-        input, select, button {
+        input, button {
             padding: 14px 18px;
             font-size: 18px;
             border: 1px solid #333;
@@ -154,10 +217,6 @@
             background: #2a2a2a;
             color: #fff;
             min-width: 0;
-        }
-        select {
-            background: #2a2a2a;
-            color: #fff;
         }
         .btn-search {
             background-color: #0088ff;
@@ -193,7 +252,7 @@
             padding: 20px;
             border-radius: 12px;
             border-left: 6px solid #0088ff;
-            margin-bottom: 0; /* Контролира се от grid gap */
+            margin-bottom: 0;
         }
         .card-title { font-size: 20px; font-weight: bold; margin-bottom: 6px; color: #fff; }
         .card-address { color: #aaa; font-size: 15px; margin-bottom: 15px; }
@@ -209,7 +268,6 @@
         .status-not-ok { color: #ff5252; font-weight: bold; }
         .loading { font-size: 20px; text-align: center; color: #888; margin: 30px 0; }
         .info-msg { text-align: center; font-size: 18px; color: #aaa; margin-top: 20px; }
-        .last-update { text-align: right; font-size: 13px; color: #666; margin-bottom: 10px; }
 
         /* Стил за подравняване и размер на векторните икони */
         .icon {
@@ -222,7 +280,7 @@
         /* Оптимизация за мобилни устройства */
         @media (max-width: 768px) {
             #results {
-                grid-template-columns: 1fr; /* Връщане към 1 колона за малки екрани */
+                grid-template-columns: 1fr;
             }
 
             body {
@@ -238,27 +296,40 @@
             .controls-top {
                 width: 100%;
                 justify-content: space-between;
+                flex-wrap: wrap;
+            }
+
+            .last-update {
+                width: 100%;
+                text-align: left;
+                order: 3;
             }
 
             .search-box {
-                display: grid;
-                grid-template-columns: 1fr auto;
+                display: flex;
+                flex-wrap: wrap;
                 gap: 10px;
                 padding: 12px;
             }
 
             input[type="text"] {
-                grid-column: 1 / -1;
                 width: 100%;
+                flex-grow: 1;
             }
 
-            select {
-                grid-column: 1;
+            .type-segmented-control {
+                flex-grow: 1;
+                justify-content: center;
+            }
+
+            .btn-type-segment {
+                flex: 1;
+                text-align: center;
             }
 
             .btn-search {
-                grid-column: 2;
                 min-width: auto;
+                padding: 12px 18px;
             }
 
             .btn-quick {
@@ -275,13 +346,14 @@
 <body>
 
     <div class="header">
-     <h2>
-        <svg class="icon" viewBox="0 0 100 100"><path d="M58 5 L18 55 H48 L42 95 L82 45 H52 Z" fill="#FFD700" stroke="#FF8C00" stroke-width="3" stroke-linejoin="round"/></svg>
-         Fines Charging Status
-     </h2>
+        <h2>
+            <svg class="icon" viewBox="0 0 100 100"><path d="M58 5 L18 55 H48 L42 95 L82 45 H52 Z" fill="#FFD700" stroke="#FF8C00" stroke-width="3" stroke-linejoin="round"/></svg>
+            Fines Charging Status
+        </h2>
         <div class="controls-top">
+            <div id="last-update-time" class="last-update"></div>
             <button class="btn-refresh" id="btn-auto-refresh" onclick="toggleAutoRefresh()">
-               <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#0088ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+               <svg class="icon icon-refresh" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
                <span id="refresh-text">Auto 2 min</span>
             </button>
             <div class="lang-switch">
@@ -293,11 +365,12 @@
     
     <div class="search-box">
         <input type="text" id="cityInput" placeholder="" onkeypress="if(event.key==='Enter') searchStations()" autofocus />
-        <select id="typeSelect" onchange="searchStations()">
-            <option value="" id="opt-ccs"></option>
-            <option value="AC" id="opt-ac"></option>
-            <option value="CHAdeMO" id="opt-chademo"></option>
-        </select>
+        
+        <div class="type-segmented-control">
+            <button class="btn-type-segment active" id="btn-type-ccs" onclick="setTypeFilter('')">CCS</button>
+            <button class="btn-type-segment" id="btn-type-ac" onclick="setTypeFilter('ac')">+AC</button>
+        </div>
+
         <button class="btn-search" onclick="searchStations()" id="btn-search-text"></button>
     </div>
 
@@ -317,7 +390,6 @@
         <button class="btn-quick" onclick="quickSearch('Добрич')" id="btn-city-db"></button>
     </div>
 
-    <div id="last-update-time" class="last-update"></div>
     <div id="results"></div>
 
     <script>
@@ -325,9 +397,6 @@
             bg: {
                 placeholder: "Въведете град...",
                 btnSearch: "Търси",
-                optCcs: "Само CCS",
-                optAc: "CCS + AC",
-                optChademo: "CCS + CHAdeMO",
                 autoRefreshOn: "Auto 120s: ВКЛ",
                 autoRefreshOff: "Auto 120s: ИЗКЛ",
                 cityVT: "В. Търново",
@@ -353,14 +422,11 @@
                 connectorLabel: "Кабел",
                 noConnectors: "Няма намерени конектори от избрания тип.",
                 errorMsg: "Грешка при зареждането на данните.",
-                updatedAt: "Последно обновяване:"
+                updatedAt: "Обновено:"
             },
             en: {
                 placeholder: "Enter city...",
                 btnSearch: "Search",
-                optCcs: "CCS Only",
-                optAc: "CCS + AC",
-                optChademo: "CCS + CHAdeMO",
                 autoRefreshOn: "Auto 120s: ON",
                 autoRefreshOff: "Auto 120s: OFF",
                 cityVT: "V. Tarnovo",
@@ -386,18 +452,21 @@
                 connectorLabel: "Cable",
                 noConnectors: "No connectors found matching your selection.",
                 errorMsg: "Error loading data.",
-                updatedAt: "Last updated:"
+                updatedAt: "Updated:"
             }
         };
 
         let currentLang = localStorage.getItem('fines_lang') || 'bg';
         let refreshTimer = null;
         let isAutoRefreshActive = false;
+        let selectedTypeFilter = '';
 
-        // Автоматично определяне на Ден / Нощ спрямо часа
+        const CACHE_KEY_LOCATIONS = 'fines_locations_data';
+        const CACHE_KEY_LOCATIONS_TIME = 'fines_locations_time';
+        const CACHE_TTL_MS = 60 * 60 * 1000; // 60 минути
+
         function applyDayNightTheme() {
             const hour = new Date().getHours();
-            // Светла тема между 07:00 и 19:00 часа
             const isDay = hour >= 7 && hour < 19;
             
             if (isDay) {
@@ -425,9 +494,6 @@
             
             document.getElementById('cityInput').placeholder = t.placeholder;
             document.getElementById('btn-search-text').innerText = t.btnSearch;
-            document.getElementById('opt-ccs').innerText = t.optCcs;
-            document.getElementById('opt-ac').innerText = t.optAc;
-            document.getElementById('opt-chademo').innerText = t.optChademo;
             
             document.getElementById('refresh-text').innerText = isAutoRefreshActive ? t.autoRefreshOn : t.autoRefreshOff;
 
@@ -439,12 +505,20 @@
             document.getElementById('btn-city-bs').innerText = t.cityBS;
             document.getElementById('btn-city-rs').innerText = t.cityRS;
             document.getElementById('btn-city-sz').innerText = t.citySZ;
-            // document.getElementById('btn-city-sh').innerText = t.citySH;
             document.getElementById('btn-city-db').innerText = t.cityDB;
-            // document.getElementById('btn-city-vd').innerText = t.cityVD;
             document.getElementById('btn-hwy-a1').innerText = t.hwyA1;
             document.getElementById('btn-hwy-a2').innerText = t.hwyA2;
             document.getElementById('btn-hwy-a3').innerText = t.hwyA3;
+        }
+
+        function setTypeFilter(type) {
+            selectedTypeFilter = type;
+            document.getElementById('btn-type-ccs').classList.toggle('active', type === '');
+            document.getElementById('btn-type-ac').classList.toggle('active', type === 'ac');
+            
+            if (document.getElementById('cityInput').value.trim() !== '') {
+                searchStations();
+            }
         }
 
         function toggleAutoRefresh() {
@@ -472,20 +546,43 @@
             searchStations();
         }
 
+        // Кеширане на локациите
+        async function getLocations() {
+            const cachedData = localStorage.getItem(CACHE_KEY_LOCATIONS);
+            const cachedTime = localStorage.getItem(CACHE_KEY_LOCATIONS_TIME);
+            const now = Date.now();
+
+            if (cachedData && cachedTime && (now - parseInt(cachedTime, 10) < CACHE_TTL_MS)) {
+                try {
+                    return JSON.parse(cachedData);
+                } catch (e) {
+                    console.warn('Възникна грешка при четенето на кеша:', e);
+                }
+            }
+
+            const locResponse = await fetch('https://public.finescharging.com/v1/locations.geojson');
+            const locData = await locResponse.json();
+
+            try {
+                localStorage.setItem(CACHE_KEY_LOCATIONS, JSON.stringify(locData));
+                localStorage.setItem(CACHE_KEY_LOCATIONS_TIME, now.toString());
+            } catch (e) {
+                console.warn('Неуспешно записване в localStorage (вероятно надвишен лимит):', e);
+            }
+
+            return locData;
+        }
+
         async function searchStations(isSilentRefresh = false) {
             const t = i18n[currentLang];
             const searchTerm = document.getElementById('cityInput').value.trim().toLowerCase();
-            const secondType = document.getElementById('typeSelect').value.toLowerCase();
             const resultsDiv = document.getElementById('results');
             const updateTimeDiv = document.getElementById('last-update-time');
             
-            // Дефиниции за SVG икони
             const svgPin = `<svg class="icon" viewBox="0 0 24 24" fill="#ff4d4d"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
             const svgHome = `<svg class="icon" viewBox="0 0 24 24" fill="#4da6ff"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>`;
             const svgCheck = `<svg class="icon" viewBox="0 0 24 24" fill="#00e676"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>`;
             const svgCross = `<svg class="icon" viewBox="0 0 24 24" fill="#ff5252"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.52 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>`;
-            // За зареждане (Loading):
-            const svgLoading = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;            
 
             if (!searchTerm) {
                 resultsDiv.innerHTML = `<p class="info-msg">${t.promptInput}</p>`;
@@ -498,8 +595,7 @@
             }
 
             try {
-                const locResponse = await fetch('https://public.finescharging.com/v1/locations.geojson');
-                const locData = await locResponse.json();
+                const locData = await getLocations();
 
                 const matchedLocations = locData.features.filter(f => {
                     const nameMatch = f.properties.name && f.properties.name.toLowerCase().includes(searchTerm);
@@ -513,10 +609,27 @@
                     return;
                 }
 
+                // Паралелно извличане на live данните за всички съвпадащи локации
+                const livePromises = matchedLocations.map(async (loc) => {
+                    try {
+                        const liveResponse = await fetch(`https://public.finescharging.com/v1/live/${loc.id}.json`);
+                        if (!liveResponse.ok) return null;
+                        const liveData = await liveResponse.json();
+                        return { loc, liveData };
+                    } catch (err) {
+                        console.error(`Грешка при зареждане на live данни за ${loc.id}:`, err);
+                        return null;
+                    }
+                });
+
+                const liveResults = await Promise.all(livePromises);
+
                 let htmlOutput = '';
 
-                for (const loc of matchedLocations) {
-                    const locId = loc.id;
+                for (const item of liveResults) {
+                    if (!item || !item.liveData || !item.liveData.connectors) continue;
+
+                    const { loc, liveData } = item;
                     const locName = loc.properties.name || 'Unknown';
                     
                     let address = t.noAddress;
@@ -526,25 +639,24 @@
                         address = loc.properties.address;
                     }
 
-                    const liveResponse = await fetch(`https://public.finescharging.com/v1/live/${locId}.json`);
-                    if (!liveResponse.ok) continue;
-                    const liveData = await liveResponse.json();
-
-                    if (!liveData.connectors) continue;
+                    let mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locName + ' ' + address)}`;
+                    if (loc.geometry && Array.isArray(loc.geometry.coordinates) && loc.geometry.coordinates.length >= 2) {
+                        const lng = loc.geometry.coordinates[0];
+                        const lat = loc.geometry.coordinates[1];
+                        mapUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+                    }
 
                     const matchedConnectors = liveData.connectors.filter(conn => {
                         const plug = (conn.plug_type || '').toLowerCase();
                         const name = (conn.name || '').toLowerCase();
                         
                         const isCCS = plug.includes('ccs') || name.includes('ccs');
-                        const isSecond = secondType !== '' && (plug.includes(secondType) || name.includes(secondType));
+                        const isSecond = selectedTypeFilter !== '' && (plug.includes(selectedTypeFilter) || name.includes(selectedTypeFilter) || plug.includes('chademo') || name.includes('chademo'));
 
                         return isCCS || isSecond;
                     });
 
                     if (matchedConnectors.length > 0) {
-                        const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locName + ' ' + address)}`;
-
                         htmlOutput += `
                             <div class="card">
                                 <div class="card-title">${svgPin} ${locName}</div>
@@ -582,7 +694,6 @@
             }
         }
 
-        // Инициализация при зареждане
         applyDayNightTheme();
         updateUI();
     </script>
